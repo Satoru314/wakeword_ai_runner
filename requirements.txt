@@ -1,3 +1,4 @@
 openwakeword
 onnxruntime
 numpy
+faster-whisper
