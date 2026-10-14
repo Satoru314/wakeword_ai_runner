@@ -1,9 +1,9 @@
 """「アレクサ」で起動して、話した内容を Claude に投げて返事を表示する。Ctrl+C で終了。"""
 
 import subprocess
+import sys
 import openwakeword
 import numpy
-from faster_whisper import WhisperModel
 
 def start_maiku():
     return subprocess.Popen(
@@ -11,7 +11,6 @@ def start_maiku():
         stdout=subprocess.PIPE,
     )
 
-whisper = WhisperModel("large-v3-turbo", compute_type="int8")
 proc = start_maiku()
 model = openwakeword.model.Model(inference_framework="onnx")
 
@@ -20,7 +19,7 @@ while True:
     samples = numpy.frombuffer(chunk, dtype=numpy.int16)
     prediction = model.predict(samples)
     print(prediction['alexa'])
-    if prediction['alexa'] > 0.5:
+    if prediction['alexa']  > 0.5:
         print("検出！", prediction['alexa'])
         subprocess.Popen(["afplay", "決定ボタンを押す2.wav"])
 
@@ -40,8 +39,11 @@ while True:
 
         subprocess.Popen(["afplay", "カーソル移動4.wav"])
         if voiced >= 5:
-            segments, _ = whisper.transcribe(numpy.frombuffer(audio, dtype=numpy.int16).astype(numpy.float32) / 32768, language="ja")
-            text = "".join(s.text for s in segments)
+            # 別プロセスの Python で stt_mac.transcribe を呼ぶ。終わればそのプロセスごと Whisper のメモリが返る
+            text = subprocess.run(
+                [sys.executable, "-c", "import sys, stt_mac; print(stt_mac.transcribe(sys.stdin.buffer.read()))"],
+                input=audio, capture_output=True,
+            ).stdout.decode().strip()
             print("あなた:", text)
 
             reply = subprocess.run(
